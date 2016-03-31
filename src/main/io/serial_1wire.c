@@ -32,6 +32,7 @@
 #include "io/serial_1wire.h"
 #include "io/beeper.h"
 #include "drivers/pwm_mapping.h"
+#include "drivers/pwm_output.h"
 #include "flight/mixer.h"
 
 uint8_t escCount; // we detect the hardware dynamically
@@ -42,7 +43,7 @@ static void gpio_set_mode(GPIO_TypeDef* gpio, uint16_t pin, GPIO_Mode mode) {
     gpio_config_t cfg;
     cfg.pin = pin;
     cfg.mode = mode;
-    cfg.speed = Speed_10MHz;
+    cfg.speed = Speed_2MHz;
     gpioInit(gpio, &cfg);
 }
 
@@ -61,6 +62,7 @@ static uint32_t GetPinPos(uint32_t pin) {
 void usb1WireInitialize()
 {
     escCount = 0;
+    pwmDisableMotors();
     memset(&escHardware,0,sizeof(escHardware));
     pwmIOConfiguration_t *pwmIOConfiguration = pwmGetOutputConfiguration();
     for (volatile uint8_t i = 0; i < pwmIOConfiguration->ioCount; i++) {
@@ -74,6 +76,14 @@ void usb1WireInitialize()
             }
         }
     }
+}
+
+void usb1WireDeInitialize(void){
+    for (uint8_t selected_esc = 0; selected_esc < (escCount); selected_esc++) {
+        gpio_set_mode(escHardware[selected_esc].gpio,escHardware[selected_esc].pin, Mode_AF_PP); //GPIO_Mode_IPU
+    }
+    escCount = 0;
+    pwmEnableMotors();
 }
 
 #ifdef STM32F10X
@@ -153,7 +163,7 @@ void usb1WirePassthrough(uint8_t escIndex)
     GPIO_ResetBits(S1W_RX_GPIO, S1W_RX_PIN);
     GPIO_ResetBits(S1W_TX_GPIO, S1W_TX_PIN);
     // configure gpio
-    gpio_set_mode(S1W_RX_GPIO, S1W_RX_PIN, Mode_IPU);
+    //gpio_set_mode(S1W_RX_GPIO, S1W_RX_PIN, Mode_IPU);
     gpio_set_mode(S1W_TX_GPIO, S1W_TX_PIN, Mode_Out_PP);
 
 #ifdef STM32F10X
@@ -209,6 +219,8 @@ void usb1WirePassthrough(uint8_t escIndex)
     // we get here in case ct reached zero
     TX_SET_HIGH;
     RX_LED_OFF;
+    // reactivate serial port
+    gpio_set_mode(S1W_TX_GPIO, S1W_TX_PIN, Mode_AF_PP);
     // Enable all irq (for Hardware UART)
     __enable_irq();
     return;
