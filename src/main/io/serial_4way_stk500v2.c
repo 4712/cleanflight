@@ -232,7 +232,7 @@ static uint8_t StkRcvPacket(uint8_t *pstring)
     ReadByte(&Len.bytes[1]);
     if (Len.bytes[1] > 1) goto Err;
     ReadByte(&Len.bytes[0]);
-    if (Len.bytes[0] < 1) goto Err;
+    if (Len.word < 1) goto Err;
     if (!ReadByte(&bt) || (bt != TOKEN)) goto Err;
     if (!ReadByte(&bt) || (bt != StkCmd)) goto Err;
     if (!ReadByte(&bt) || (bt != STATUS_CMD_OK)) goto Err;
