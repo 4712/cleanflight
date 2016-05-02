@@ -226,14 +226,17 @@ static uint8_t StkRcvPacket(uint8_t *pstring)
     ReadByte(&Len.bytes[0]);
     if (Len.word < 1) goto Err;
     if (!ReadByte(&bt) || (bt != TOKEN)) goto Err;
+    // MessageBody
     if (!ReadByte(&bt) || (bt != StkCmd)) goto Err;
     if (!ReadByte(&bt) || (bt != STATUS_CMD_OK)) goto Err;
-    for (uint16_t i = 0; i < (Len.word - 2); i++)
+    for (uint16_t i = 0; i < (Len.word - 3); i++)
     {
          if (!ReadByte(pstring)) goto Err;
          pstring++;
     }
-    ReadByte(&bt);
+    ReadByte(&bt);// ACK byte
+    // MessageBody end
+    ReadByte(&bt);// ckeck sum
     if (ckSumIn != 0) goto Err;
     IRQ_ON;
     return 1;
