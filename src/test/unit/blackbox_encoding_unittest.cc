@@ -24,8 +24,8 @@ extern "C" {
     #include "blackbox/blackbox_encoding.h"
     #include "common/utils.h"
 
-    #include "config/parameter_group.h"
-    #include "config/parameter_group_ids.h"
+    #include "pg/pg.h"
+    #include "pg/pg_ids.h"
 
     #include "drivers/serial.h"
     #include "io/serial.h"
@@ -246,7 +246,7 @@ PG_REGISTER(blackboxConfig_t, blackboxConfig, PG_BLACKBOX_CONFIG, 0);
 int32_t blackboxHeaderBudget;
 void mspSerialAllocatePorts(void) {}
 void blackboxWrite(uint8_t value) {serialWrite(blackboxPort, value);}
-int blackboxPrint(const char *s)
+int blackboxWriteString(const char *s)
 {
     const uint8_t *pos = (uint8_t*)s;
     while (*pos) {

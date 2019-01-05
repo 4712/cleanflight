@@ -1,27 +1,33 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #include <errno.h>
 #include <time.h>
+
+#include "common/maths.h"
 
 #include "drivers/io.h"
 #include "drivers/dma.h"
@@ -41,6 +47,8 @@ const timerHardware_t timerHardware[1]; // unused
 #include "config/feature.h"
 #include "fc/config.h"
 #include "scheduler/scheduler.h"
+
+#include "pg/rx.h"
 
 #include "rx/rx.h"
 
@@ -92,17 +100,17 @@ void updateState(const fdm_packet* pkt) {
     }
 
     int16_t x,y,z;
-    x = -pkt->imu_linear_acceleration_xyz[0] * ACC_SCALE;
-    y = -pkt->imu_linear_acceleration_xyz[1] * ACC_SCALE;
-    z = -pkt->imu_linear_acceleration_xyz[2] * ACC_SCALE;
+    x = constrain(-pkt->imu_linear_acceleration_xyz[0] * ACC_SCALE, -32767, 32767);
+    y = constrain(-pkt->imu_linear_acceleration_xyz[1] * ACC_SCALE, -32767, 32767);
+    z = constrain(-pkt->imu_linear_acceleration_xyz[2] * ACC_SCALE, -32767, 32767);
     fakeAccSet(fakeAccDev, x, y, z);
-//	printf("[acc]%lf,%lf,%lf\n", pkt->imu_linear_acceleration_xyz[0], pkt->imu_linear_acceleration_xyz[1], pkt->imu_linear_acceleration_xyz[2]);
+//    printf("[acc]%lf,%lf,%lf\n", pkt->imu_linear_acceleration_xyz[0], pkt->imu_linear_acceleration_xyz[1], pkt->imu_linear_acceleration_xyz[2]);
 
-    x = pkt->imu_angular_velocity_rpy[0] * GYRO_SCALE * RAD2DEG;
-    y = -pkt->imu_angular_velocity_rpy[1] * GYRO_SCALE * RAD2DEG;
-    z = -pkt->imu_angular_velocity_rpy[2] * GYRO_SCALE * RAD2DEG;
+    x = constrain(pkt->imu_angular_velocity_rpy[0] * GYRO_SCALE * RAD2DEG, -32767, 32767);
+    y = constrain(-pkt->imu_angular_velocity_rpy[1] * GYRO_SCALE * RAD2DEG, -32767, 32767);
+    z = constrain(-pkt->imu_angular_velocity_rpy[2] * GYRO_SCALE * RAD2DEG, -32767, 32767);
     fakeGyroSet(fakeGyroDev, x, y, z);
-//	printf("[gyr]%lf,%lf,%lf\n", pkt->imu_angular_velocity_rpy[0], pkt->imu_angular_velocity_rpy[1], pkt->imu_angular_velocity_rpy[2]);
+//    printf("[gyr]%lf,%lf,%lf\n", pkt->imu_angular_velocity_rpy[0], pkt->imu_angular_velocity_rpy[1], pkt->imu_angular_velocity_rpy[2]);
 
 #if defined(SKIP_IMU_CALC)
 #if defined(SET_IMU_FROM_EULER)
@@ -142,12 +150,12 @@ void updateState(const fdm_packet* pkt) {
 
 
     if (deltaSim < 0.02 && deltaSim > 0) { // simulator should run faster than 50Hz
-//		simRate = simRate * 0.5 + (1e6 * deltaSim / (realtime_now - last_realtime)) * 0.5;
+//        simRate = simRate * 0.5 + (1e6 * deltaSim / (realtime_now - last_realtime)) * 0.5;
         struct timespec out_ts;
         timeval_sub(&out_ts, &now_ts, &last_ts);
         simRate = deltaSim / (out_ts.tv_sec + 1e-9*out_ts.tv_nsec);
     }
-//	printf("simRate = %lf, millis64 = %lu, millis64_real = %lu, deltaSim = %lf\n", simRate, millis64(), millis64_real(), deltaSim*1e6);
+//    printf("simRate = %lf, millis64 = %lu, millis64_real = %lu, deltaSim = %lf\n", simRate, millis64(), millis64_real(), deltaSim*1e6);
 
     last_timestamp = pkt->timestamp;
     last_realtime = micros64_real();
@@ -169,7 +177,7 @@ static void* udpThread(void* data) {
     while (workerRunning) {
         n = udpRecv(&stateLink, &fdmPkt, sizeof(fdm_packet), 100);
         if (n == sizeof(fdm_packet)) {
-//			printf("[data]new fdm %d\n", n);
+//            printf("[data]new fdm %d\n", n);
             updateState(&fdmPkt);
         }
     }
@@ -251,12 +259,6 @@ void systemResetToBootloader(void) {
     exit(0);
 }
 
-// drivers/light_led.c
-void ledInit(const statusLedConfig_t *statusLedConfig) {
-    UNUSED(statusLedConfig);
-    printf("[led]Init...\n");
-}
-
 void timerInit(void) {
     printf("[timer]Init...\n");
 }
@@ -304,7 +306,7 @@ uint64_t micros64() {
     last = now;
 
     return out*1e-3;
-//	return micros64_real();
+//    return micros64_real();
 }
 
 uint64_t millis64() {
@@ -316,7 +318,7 @@ uint64_t millis64() {
     last = now;
 
     return out*1e-6;
-//	return millis64_real();
+//    return millis64_real();
 }
 
 uint32_t micros(void) {
@@ -374,7 +376,7 @@ int timeval_sub(struct timespec *result, struct timespec *x, struct timespec *y)
 
 
 // PWM part
-bool pwmMotorsEnabled = false;
+static bool pwmMotorsEnabled = false;
 static pwmOutputPort_t motors[MAX_SUPPORTED_MOTORS];
 static pwmOutputPort_t servos[MAX_SUPPORTED_SERVOS];
 
@@ -404,6 +406,10 @@ void servoDevInit(const servoDevConfig_t *servoConfig) {
 
 pwmOutputPort_t *pwmGetMotors(void) {
     return motors;
+}
+
+void pwmEnableMotors(void) {
+    pwmMotorsEnabled = true;
 }
 
 bool pwmAreMotorsEnabled(void) {
@@ -442,7 +448,7 @@ void pwmCompleteMotorUpdate(uint8_t motorCount) {
     // get one "fdm_packet" can only send one "servo_packet"!!
     if (pthread_mutex_trylock(&updateLock) != 0) return;
     udpSend(&pwmLink, &pwmPkt, sizeof(servo_packet));
-//	printf("[pwm]%u:%u,%u,%u,%u\n", idlePulse, motorsPwm[0], motorsPwm[1], motorsPwm[2], motorsPwm[3]);
+//    printf("[pwm]%u:%u,%u,%u,%u\n", idlePulse, motorsPwm[0], motorsPwm[1], motorsPwm[2], motorsPwm[3]);
 }
 
 void pwmWriteServo(uint8_t index, float value) {
@@ -460,15 +466,12 @@ char _estack;
 char _Min_Stack_Size;
 
 // fake EEPROM
-uint8_t __config_start;
-uint8_t __config_end;
 static FILE *eepromFd = NULL;
+uint8_t eepromData[EEPROM_SIZE];
 
 void FLASH_Unlock(void) {
-    uint8_t * const eeprom = &__config_start;
-
     if (eepromFd != NULL) {
-        printf("[FLASH_Unlock] eepromFd != NULL\n");
+        fprintf(stderr, "[FLASH_Unlock] eepromFd != NULL\n");
         return;
     }
 
@@ -477,44 +480,53 @@ void FLASH_Unlock(void) {
     if (eepromFd != NULL) {
         // obtain file size:
         fseek(eepromFd , 0 , SEEK_END);
-        long lSize = ftell(eepromFd);
+        size_t lSize = ftell(eepromFd);
         rewind(eepromFd);
 
-        printf("[FLASH_Unlock]size = %ld, %ld\n", lSize, (long)(&__config_end - &__config_start));
-        for (unsigned i = 0; i < (uintptr_t)(&__config_end - &__config_start); i++) {
-                int c = fgetc(eepromFd);
-            if (c == EOF) break;
-            eeprom[i] = (uint8_t)c;
+        size_t n = fread(eepromData, 1, sizeof(eepromData), eepromFd);
+        if (n == lSize) {
+            printf("[FLASH_Unlock] loaded '%s', size = %ld / %ld\n", EEPROM_FILENAME, lSize, sizeof(eepromData));
+        } else {
+            fprintf(stderr, "[FLASH_Unlock] failed to load '%s'\n", EEPROM_FILENAME);
+            return;
         }
     } else {
-        eepromFd = fopen(EEPROM_FILENAME, "w+");
-        fwrite(eeprom, sizeof(uint8_t), &__config_end - &__config_start, eepromFd);
+        printf("[FLASH_Unlock] created '%s', size = %ld\n", EEPROM_FILENAME, sizeof(eepromData));
+        if ((eepromFd = fopen(EEPROM_FILENAME, "w+")) == NULL) {
+            fprintf(stderr, "[FLASH_Unlock] failed to create '%s'\n", EEPROM_FILENAME);
+            return;
+        }
+        if (fwrite(eepromData, sizeof(eepromData), 1, eepromFd) != 1) {
+            fprintf(stderr, "[FLASH_Unlock] write failed: %s\n", strerror(errno));
+        }
     }
 }
 
 void FLASH_Lock(void) {
     // flush & close
     if (eepromFd != NULL) {
-        const uint8_t *eeprom = &__config_start;
         fseek(eepromFd, 0, SEEK_SET);
-        fwrite(eeprom, 1, &__config_end - &__config_start, eepromFd);
+        fwrite(eepromData, 1, sizeof(eepromData), eepromFd);
         fclose(eepromFd);
         eepromFd = NULL;
+        printf("[FLASH_Lock] saved '%s'\n", EEPROM_FILENAME);
+    } else {
+        fprintf(stderr, "[FLASH_Lock] eeprom is not unlocked\n");
     }
 }
 
 FLASH_Status FLASH_ErasePage(uintptr_t Page_Address) {
     UNUSED(Page_Address);
-//	printf("[FLASH_ErasePage]%x\n", Page_Address);
+//    printf("[FLASH_ErasePage]%x\n", Page_Address);
     return FLASH_COMPLETE;
 }
 
-FLASH_Status FLASH_ProgramWord(uintptr_t addr, uint32_t Data) {
-    if ((addr >= (uintptr_t)&__config_start)&&(addr < (uintptr_t)&__config_end)) {
-        *((uint32_t*)addr) = Data;
-        printf("[FLASH_ProgramWord]0x%p = %x\n", (void*)addr, *((uint32_t*)addr));
+FLASH_Status FLASH_ProgramWord(uintptr_t addr, uint32_t value) {
+    if ((addr >= (uintptr_t)eepromData) && (addr < (uintptr_t)ARRAYEND(eepromData))) {
+        *((uint32_t*)addr) = value;
+        printf("[FLASH_ProgramWord]%p = %08x\n", (void*)addr, *((uint32_t*)addr));
     } else {
-            printf("[FLASH_ProgramWord]Out of Range! 0x%p\n", (void*)addr);
+            printf("[FLASH_ProgramWord]%p out of range!\n", (void*)addr);
     }
     return FLASH_COMPLETE;
 }

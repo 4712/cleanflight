@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -23,7 +26,7 @@
 #define UARTDEV_COUNT_MAX 3
 #define UARTHARDWARE_MAX_PINS 3
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE     256
+#define UART_RX_BUFFER_SIZE     128
 #endif
 #ifndef UART_TX_BUFFER_SIZE
 #define UART_TX_BUFFER_SIZE     256
@@ -32,7 +35,7 @@
 #define UARTDEV_COUNT_MAX 5
 #define UARTHARDWARE_MAX_PINS 4
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE     256
+#define UART_RX_BUFFER_SIZE     128
 #endif
 #ifndef UART_TX_BUFFER_SIZE
 #define UART_TX_BUFFER_SIZE     256
@@ -41,19 +44,19 @@
 #define UARTDEV_COUNT_MAX 6
 #define UARTHARDWARE_MAX_PINS 4
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE     512
+#define UART_RX_BUFFER_SIZE     128
 #endif
 #ifndef UART_TX_BUFFER_SIZE
-#define UART_TX_BUFFER_SIZE     512
+#define UART_TX_BUFFER_SIZE     256
 #endif
 #elif defined(STM32F7)
 #define UARTDEV_COUNT_MAX 8
 #define UARTHARDWARE_MAX_PINS 3
 #ifndef UART_RX_BUFFER_SIZE
-#define UART_RX_BUFFER_SIZE     512
+#define UART_RX_BUFFER_SIZE     128
 #endif
 #ifndef UART_TX_BUFFER_SIZE
-#define UART_TX_BUFFER_SIZE     512
+#define UART_TX_BUFFER_SIZE     256
 #endif
 #else
 #error unknown MCU family
@@ -112,7 +115,7 @@
 #define UARTDEV_COUNT (UARTDEV_COUNT_1 + UARTDEV_COUNT_2 + UARTDEV_COUNT_3 + UARTDEV_COUNT_4 + UARTDEV_COUNT_5 + UARTDEV_COUNT_6 + UARTDEV_COUNT_7 + UARTDEV_COUNT_8)
 
 typedef struct uartHardware_s {
-    UARTDevice device;    // XXX Not required for full allocation
+    UARTDevice_e device;    // XXX Not required for full allocation
     USART_TypeDef* reg;
 #if defined(STM32F1) || defined(STM32F3)
     DMA_Channel_TypeDef *txDMAChannel;
@@ -156,14 +159,17 @@ typedef struct uartDevice_s {
     volatile uint8_t txBuffer[UART_TX_BUFFER_SIZE];
 } uartDevice_t;
 
-extern uartDevice_t uartDevice[];
 extern uartDevice_t *uartDevmap[];
 
 extern const struct serialPortVTable uartVTable[];
 
+#ifdef USE_HAL_DRIVER
 void uartStartTxDMA(uartPort_t *s);
+#else
+void uartTryStartTxDMA(uartPort_t *s);
+#endif
 
-uartPort_t *serialUART(UARTDevice device, uint32_t baudRate, portMode_t mode, portOptions_t options);
+uartPort_t *serialUART(UARTDevice_e device, uint32_t baudRate, portMode_e mode, portOptions_e options);
 
 void uartIrqHandler(uartPort_t *s);
 
